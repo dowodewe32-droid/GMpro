@@ -1,28 +1,26 @@
 /* This software is licensed under the MIT License: https://github.com/spacehuhntech/esp8266_deauther */
 
 #include "led.h"
+#include "A_config.h" 
+#include <Arduino.h>  
+#include "language.h" 
+#include "settings.h" 
+#include "Attack.h"   
+#include "Scan.h"     
 
-#include "A_config.h" // Config for LEDs
-#include <Arduino.h>  // digitalWrite, analogWrite, pinMode
-#include "language.h" // Strings used in printColor and tempDisable
-#include "settings.h" // used in update()
-#include "Attack.h"   // used in update()
-#include "Scan.h"     // used in update()
-
-// FIX: Menggunakan library sistem agar terbaca oleh Arduinodroid
+// FIX: Pakai kurung sudut agar mencari di library sistem Arduinodroid
 #if defined(LED_NEOPIXEL)
-#include <Adafruit_NeoPixel.h>
+    #include <Adafruit_NeoPixel.h>
 #elif defined(LED_MY92)
-#include <my92xx.h>
+    #include <my92xx.h>
 #elif defined(LED_DOTSTAR)
-#include <Adafruit_DotStar.h>
+    #include <Adafruit_DotStar.h>
 #endif 
 
 extern Attack attack;
 extern Scan   scan;
 
 namespace led {
-    // ===== PRIVATE ===== //
     LED_MODE mode = OFF;
 
 #if defined(LED_NEOPIXEL_RGB)
@@ -34,7 +32,6 @@ namespace led {
 #elif defined(LED_DOTSTAR)
     Adafruit_DotStar strip { LED_NUM, LED_DOTSTAR_DATA, LED_DOTSTAR_CLK, DOTSTAR_BGR };
 #endif
-
 
     void setColor(uint8_t r, uint8_t g, uint8_t b) {
 #if defined(LED_DIGITAL)
@@ -48,89 +45,39 @@ namespace led {
             if (LED_PIN_B < 255) digitalWrite(LED_PIN_B, b == 0);
         }
 #elif defined(LED_RGB)
-        if (r > 0) r = r * LED_MODE_BRIGHTNESS / 100;
-        if (g > 0) g = g * LED_MODE_BRIGHTNESS / 100;
-        if (b > 0) b = b * LED_MODE_BRIGHTNESS / 100;
-
-        if (LED_ANODE) {
-            r = 255 - r;
-            g = 255 - g;
-            b = 255 - b;
-        }
-
-        analogWrite(LED_PIN_R, r);
-        analogWrite(LED_PIN_G, g);
-        analogWrite(LED_PIN_B, b);
+        analogWrite(LED_PIN_R, LED_ANODE ? 255-r : r);
+        analogWrite(LED_PIN_G, LED_ANODE ? 255-g : g);
+        analogWrite(LED_PIN_B, LED_ANODE ? 255-b : b);
 #elif defined(LED_NEOPIXEL) || defined(LED_DOTSTAR)
-
-        for (size_t i = 0; i < (size_t)strip.numPixels(); i++) {
-            strip.setPixelColor(i, r, g, b);
-        }
-
+        for (uint16_t i = 0; i < strip.numPixels(); i++) strip.setPixelColor(i, r, g, b);
         strip.show();
-#elif defined(LED_MY9291)
-        myled.setChannel(LED_MY92_CH_R, r);
-        myled.setChannel(LED_MY92_CH_G, g);
-        myled.setChannel(LED_MY92_CH_B, b);
-        myled.setChannel(LED_MY92_CH_BRIGHTNESS, LED_MODE_BRIGHTNESS);
-        myled.setState(true);
-        myled.update();
-#endif 
+#endif
     }
 
-    // ===== PUBLIC ===== //
     void setup() {
         analogWriteRange(0xff);
-
-#if defined(LED_DIGITAL) || defined(LED_RGB)
-        if (LED_PIN_R < 255) pinMode(LED_PIN_R, OUTPUT);
-        if (LED_PIN_G < 255) pinMode(LED_PIN_G, OUTPUT);
-        if (LED_PIN_B < 255) pinMode(LED_PIN_B, OUTPUT);
-#elif defined(LED_NEOPIXEL) || defined(LED_DOTSTAR)
+#if defined(LED_NEOPIXEL) || defined(LED_DOTSTAR)
         strip.begin();
         strip.setBrightness(LED_MODE_BRIGHTNESS);
         strip.show();
-#elif defined(LED_MY9291)
-        myled.setChannel(LED_MY92_CH_R, 0);
-        myled.setChannel(LED_MY92_CH_G, 0);
-        myled.setChannel(LED_MY92_CH_B, 0);
-        myled.setChannel(LED_MY92_CH_BRIGHTNESS, LED_MODE_BRIGHTNESS);
-        myled.setState(true);
-        myled.update();
-#endif 
+#endif
     }
 
     void update() {
-        if (!settings::getLEDSettings().enabled) {
-            setMode(OFF);
-        } 
-        // FIX: Perbaikan typo pishing -> phishing agar tidak error not declared
-        else if ((scan.isScanning() && (scan.deauths < settings::getSnifferSettings().min_deauth_frames)) || attack.eviltwin == true || attack.phishing == true) {
-            setMode(SCAN);
-        } else if (attack.isRunning() || (scan.isScanning() && (scan.deauths > settings::getSnifferSettings().min_deauth_frames))) {
-            setMode(ATTACK);
-        } else {
-            setMode(IDLE);
-        }
+        if (!settings::getLEDSettings().enabled) setMode(OFF);
+        else if (attack.isRunning()) setMode(ATTACK);
+        else if (scan.isScanning()) setMode(SCAN);
+        else setMode(IDLE);
     }
 
     void setMode(LED_MODE new_mode, bool force) {
         if ((new_mode != mode) || force) {
             mode = new_mode;
-
             switch (mode) {
-                case OFF:
-                    setColor(LED_MODE_OFF);
-                    break;
-                case SCAN:
-                    setColor(LED_MODE_SCAN);
-                    break;
-                case ATTACK:
-                    setColor(LED_MODE_ATTACK);
-                    break;
-                case IDLE:
-                    setColor(LED_MODE_IDLE);
-                    break;
+                case OFF: setColor(0,0,0); break;
+                case SCAN: setColor(0,0,255); break;
+                case ATTACK: setColor(255,0,0); break;
+                case IDLE: setColor(0,255,0); break;
             }
         }
     }
