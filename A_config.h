@@ -21,35 +21,34 @@
 #define NODEMCU
 
 #ifdef NODEMCU
-  // LED (GPIO Murni)
+  // LED (Pake GPIO murni agar tidak bentrok linkage)
   #define LED_NEOPIXEL_GRB
   #define LED_NUM 1
-  #define LED_NEOPIXEL_PIN 15 // GPIO15 = D8
+  #define LED_NEOPIXEL_PIN 15 // D8
   #define LED_MODE_BRIGHTNESS 10
   
-  // Display Configuration (SH1106 I2C)
+  // Display (SH1106 I2C)
   #define USE_DISPLAY true
   #define FLIP_DIPLAY true
   #define SH1106_I2C       
   #define I2C_ADDR 0x3C
-  #define I2C_SDA 4        // GPIO4 = D2
-  #define I2C_SCL 5        // GPIO5 = D1
+  #define I2C_SDA 4        // D2
+  #define I2C_SCL 5        // D1
   #define DISPLAY_TEXT "WifiX v1.5"
   #define INTRO_STR "WifiX v1.5"
 
   // Buttons
-  #define BUTTON_UP 14     // GPIO14 = D5
-  #define BUTTON_DOWN 12   // GPIO12 = D6
-  #define BUTTON_A 2       // GPIO2  = D4
-  #define BUTTON_B 0       // GPIO0  = D3
+  #define BUTTON_UP 14     // D5
+  #define BUTTON_DOWN 12   // D6
+  #define BUTTON_A 2       // D4
+  #define BUTTON_B 0       // D3
   
   #define RESET_BUTTON 0   
 #endif
 
 // ==========================================
-// 3. NETWORK & WEB (FIXED FORMAT)
+// 3. NETWORK & WEB (STRICT FORMAT)
 // ==========================================
-// Format array {} wajib untuk IPAddress agar tidak error di wifi.cpp
 #define AP_SSID "#WifiX.1.5#"
 #define AP_PASSWD "deauther"
 #define AP_HIDDEN false
@@ -84,27 +83,16 @@
 
 #ifndef STROBE
   #define STROBE 2
-  #define NYALA HIGH
-  #define MATI LOW
 #endif
 
-// LED Colors
+// LED Colors (RGB format)
 #define LED_MODE_OFF 0, 0, 0
 #define LED_MODE_SCAN 0, 0, 255
 #define LED_MODE_ATTACK 255, 0, 0
 #define LED_MODE_IDLE 0, 255, 0
 
-// ==========================================
-// 6. LINKAGE PROTECTORS
-// ==========================================
 #if defined(LED_NEOPIXEL_RGB) || defined(LED_NEOPIXEL_GRB)
-  #ifndef LED_NEOPIXEL
-    #define LED_NEOPIXEL
-  #endif
+  #define LED_NEOPIXEL
 #endif 
-
-#ifndef USE_LED
-  #define USE_LED true
-#endif
 
 #endif // CONFIG_H
