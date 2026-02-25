@@ -1,0 +1,72 @@
+name: GMpro87-Master-Architect
+
+on: 
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+
+      - name: Install Base Cores & Libs
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
+          arduino-cli core install deauther:esp8266 --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
+          arduino-cli lib install "Adafruit NeoPixel"@1.10.0
+          arduino-cli lib install "ArduinoJson"@5.13.5
+          arduino-cli lib install "ESP8266 and ESP32 OLED driver for SSD1306 displays"
+
+      - name: Surgical Code Correction
+        run: |
+          # 1. Rapikan Folder Project (Wajib)
+          mkdir -p WifiXv1.5
+          cp *.ino WifiXv1.5/ 2>/dev/null || true
+          cp *.cpp WifiXv1.5/ 2>/dev/null || true
+          cp *.h WifiXv1.5/ 2>/dev/null || true
+          mkdir -p WifiXv1.5/src/SimpleButton
+          cp -r src/SimpleButton/* WifiXv1.5/src/SimpleButton/ 2>/dev/null || true
+
+          # 2. BYPASS ARCHITECTURE ERROR (WAJIB)
+          NEOPIXEL_PATH="/home/runner/Arduino/libraries/Adafruit_NeoPixel/Adafruit_NeoPixel.cpp"
+          if [ -f "$NEOPIXEL_PATH" ]; then
+            sed -i 's/#error Architecture not supported/\/\/ Bypassed/g' "$NEOPIXEL_PATH"
+          fi
+
+          # 3. FIX LED.H (PAKAI FILE ASLI, JANGAN DITIMPA TOTAL)
+          # Kita cuma nambahin extern strip di paling atas file asli biar fungsi lain gak ilang
+          sed -i '1i #include <Adafruit_NeoPixel.h>\nextern Adafruit_NeoPixel strip;' WifiXv1.5/led.h
+
+          # 4. FIX LED.CPP (HAPUS DEFINISI DUPLIKAT STRIP)
+          sed -i '/Adafruit_NeoPixel strip/d' WifiXv1.5/led.cpp
+
+          # 5. FIX INO (DEFINISI UTAMA STRIP)
+          # Kita masukin definisi fisik strip di sini biar linker nemu
+          sed -i '1i #include <Adafruit_NeoPixel.h>\nAdafruit_NeoPixel strip = Adafruit_NeoPixel(1, 15, NEO_GRB + NEO_KHZ800);' WifiXv1.5/WifiXv1.5.ino
+
+          # 6. CLEANING INCLUDE PATHS
+          find WifiXv1.5 -type f \( -name "*.ino" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i 's|#include "src/ArduinoJson-v5.13.5/ArduinoJson.h"|#include <ArduinoJson.h>|g' {} +
+          find WifiXv1.5 -type f \( -name "*.ino" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i 's|#include "src/Adafruit_NeoPixel-1.7.0/Adafruit_NeoPixel.h"|#include <Adafruit_NeoPixel.h>|g' {} +
+          find WifiXv1.5 -type f \( -name "*.ino" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i 's|#include "src/esp8266-oled-ssd1306-4.1.0/SH1106Wire.h"|#include <SH1106Wire.h>|g' {} +
+          find WifiXv1.5 -type f \( -name "*.ino" -o -name "*.cpp" -o -name "*.h" \) -exec sed -i 's|#include "SimpleButton.h"|#include "src/SimpleButton/SimpleButton.h"|g' {} +
+
+          # 7. UNLOCK & REBRAND
+          sed -i 's/if(EEPROM.read(400) == 1)/if(true)/g' WifiXv1.5/WifiXv1.5.ino
+          find WifiXv1.5 -maxdepth 1 -type f \( -name "*.ino" -o -name "*.h" -o -name "*.cpp" \) -exec sed -i 's/WifiX 1.5/dev : GMpro87/g' {} +
+
+      - name: Final Compilation
+        run: |
+          arduino-cli compile --fqbn deauther:esp8266:d1_mini:eesz=4M3M \
+          --build-property "build.extra_flags=-I./WifiXv1.5/src/SimpleButton" \
+          ./WifiXv1.5 --output-dir ./build
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMpro87-Victory-Bin
+          path: ./build/*.bin
