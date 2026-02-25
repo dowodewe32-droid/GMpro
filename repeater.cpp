@@ -6,10 +6,13 @@
 #include "wifi.h"
 #include "settings.h"
 
-// Library NAPT
+// Ambil library NAPT langsung dari path internal
 #include <lwip/napt.h>
 #include <lwip/dns.h>
-#include <dhcpserver.h>
+
+extern "C" {
+  #include <dhcpserver.h>
+}
 
 #define NAPT 1000
 #define NAPT_PORT 10
@@ -28,10 +31,10 @@ static bool state = false;
 
 namespace repeater {
     void connect(String ssid, String pass){
-        File file = LittleFS.open("/ssid.txt", "w");
-        if(file) { file.print(ssid); file.close(); }
-        file = LittleFS.open("/pass.txt", "w");
-        if(file) { file.print(pass); file.close(); }
+        File f1 = LittleFS.open("/ssid.txt", "w");
+        if(f1) { f1.print(ssid); f1.close(); }
+        File f2 = LittleFS.open("/pass.txt", "w");
+        if(f2) { f2.print(pass); f2.close(); }
         WiFi.mode(WIFI_AP_STA);
         WiFi.begin(ssid.c_str(), pass.c_str());
     }
@@ -42,8 +45,7 @@ namespace repeater {
         EEPROM.write(400, 0);
         EEPROM.commit();
         
-        // Langsung hajar login (simple version untuk bypass error)
-        if(WiFi.status() != WL_CONNECTED) delay(1000);
+        delay(1000); 
         
         dhcps_set_dns(0, WiFi.dnsIP(0));
         WiFi.softAPConfig(IPAddress(172, 217, 28, 254), IPAddress(172, 217, 28, 254), IPAddress(255, 255, 255, 0));
