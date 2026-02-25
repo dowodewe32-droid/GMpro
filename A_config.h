@@ -44,10 +44,10 @@
   #define BUTTON_A D4      
   #define BUTTON_B D3      
   
-  #define RESET_BUTTON 0   // GPIO0 (Flash button)
+  #define RESET_BUTTON 0   
 #endif
 
-// ========= FALLBACKS (WAJIB ADA BUAT SETTINGS.CPP) ========= //
+// ========= FALLBACKS (WAJIB BUAT SETTINGS & WIFI.CPP) ========= //
 
 #define DEAUTHER_VERSION "2.6.1"
 #define DEAUTHER_VERSION_MAJOR 2
@@ -85,6 +85,11 @@
   #define DISPLAY_TIMEOUT 600
 #endif
 
+// FIX BUAT WIFI.CPP (Log 1000197450.jpg)
+// Pakai kurung kurawal {}, bukan kurung biasa ()
+#define WEB_IP_ADDR {192, 168, 4, 1}
+#define WEB_URL "deauth.me"
+
 // =============== LED MODE DEFINITIONS =============== //
 #define LED_MODE_OFF 0, 0, 0
 #define LED_MODE_SCAN 0, 0, 255
@@ -102,7 +107,6 @@
   #define USE_LED true
 #endif 
 
-// Penutup Error Check
 #if LED_MODE_BRIGHTNESS == 0
 #error LED_MODE_BRIGHTNESS must not be zero!
 #endif 
