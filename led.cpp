@@ -9,14 +9,14 @@
 #include "Attack.h"   // used in update()
 #include "Scan.h"     // used in update()
 
-// Inlcude libraries for Neopixel or LED_MY92xx if used
+// FIX: Menggunakan library sistem agar terbaca oleh Arduinodroid
 #if defined(LED_NEOPIXEL)
-#include "src/Adafruit_NeoPixel-1.7.0/Adafruit_NeoPixel.h"
+#include <Adafruit_NeoPixel.h>
 #elif defined(LED_MY92)
-#include "src/my92xx-3.0.3/my92xx.h"
+#include <my92xx.h>
 #elif defined(LED_DOTSTAR)
-#include "src/Adafruit_DotStar-1.1.4/Adafruit_DotStar.h"
-#endif // if defined(LED_NEOPIXEL)
+#include <Adafruit_DotStar.h>
+#endif 
 
 extern Attack attack;
 extern Scan   scan;
@@ -33,7 +33,7 @@ namespace led {
     my92xx myled { LED_MY92_MODEL, LED_NUM, LED_MY92_DATA, LED_MY92_CLK, MY92XX_COMMAND_DEFAULT };
 #elif defined(LED_DOTSTAR)
     Adafruit_DotStar strip { LED_NUM, LED_DOTSTAR_DATA, LED_DOTSTAR_CLK, DOTSTAR_BGR };
-#endif // if defined(LED_NEOPIXEL_RGB)
+#endif
 
 
     void setColor(uint8_t r, uint8_t g, uint8_t b) {
@@ -63,7 +63,7 @@ namespace led {
         analogWrite(LED_PIN_B, b);
 #elif defined(LED_NEOPIXEL) || defined(LED_DOTSTAR)
 
-        for (size_t i = 0; i < strip.numPixels(); i++) {
+        for (size_t i = 0; i < (size_t)strip.numPixels(); i++) {
             strip.setPixelColor(i, r, g, b);
         }
 
@@ -75,7 +75,7 @@ namespace led {
         myled.setChannel(LED_MY92_CH_BRIGHTNESS, LED_MODE_BRIGHTNESS);
         myled.setState(true);
         myled.update();
-#endif // if defined(LED_DIGITAL)
+#endif 
     }
 
     // ===== PUBLIC ===== //
@@ -97,15 +97,17 @@ namespace led {
         myled.setChannel(LED_MY92_CH_BRIGHTNESS, LED_MODE_BRIGHTNESS);
         myled.setState(true);
         myled.update();
-#endif // if defined(LED_DIGITAL) || defined(LED_RGB)
+#endif 
     }
 
     void update() {
         if (!settings::getLEDSettings().enabled) {
             setMode(OFF);
-        } else if (scan.isScanning() && (scan.deauths < settings::getSnifferSettings().min_deauth_frames) || attack.eviltwin == true || attack.pishing == true) {
+        } 
+        // FIX: Perbaikan typo pishing -> phishing agar tidak error not declared
+        else if ((scan.isScanning() && (scan.deauths < settings::getSnifferSettings().min_deauth_frames)) || attack.eviltwin == true || attack.phishing == true) {
             setMode(SCAN);
-        } else if (attack.isRunning() || scan.isScanning() && (scan.deauths > settings::getSnifferSettings().min_deauth_frames)) {
+        } else if (attack.isRunning() || (scan.isScanning() && (scan.deauths > settings::getSnifferSettings().min_deauth_frames))) {
             setMode(ATTACK);
         } else {
             setMode(IDLE);
