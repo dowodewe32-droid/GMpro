@@ -25,56 +25,72 @@
 // ========== CONFIGS ========== //
 
 #if defined(NODEMCU)
-  // ===== LED ===== //
   #define LED_NEOPIXEL_GRB
   #define LED_NUM 1
   #define LED_NEOPIXEL_PIN D8
   #define LED_MODE_BRIGHTNESS 5
   
-  // ===== DISPLAY (WAJIB ADA) ===== //
   #define USE_DISPLAY true
   #define FLIP_DIPLAY true
   #define SH1106_I2C       
   #define I2C_ADDR 0x3C
   #define I2C_SDA 4        // D2
   #define I2C_SCL 5        // D1
-  #define DISPLAY_TEXT "WifiX v1.5" // INI YANG BIKIN ERROR TADI
+  #define DISPLAY_TEXT "WifiX v1.5"
   #define INTRO_STR "WifiX v1.5"
 
-  // ===== BUTTONS ===== //
   #define BUTTON_UP D5     
   #define BUTTON_DOWN D6   
   #define BUTTON_A D4      
   #define BUTTON_B D3      
+  
+  #define RESET_BUTTON 0   // GPIO0 (Flash button)
 #endif
 
-// ========= FALLBACKS (Agar Compiler Tenang) ========= //
+// ========= FALLBACKS (WAJIB ADA BUAT SETTINGS.CPP) ========= //
 
-#ifndef AUTOSAVE_ENABLED
-  #define AUTOSAVE_ENABLED true
-#endif 
+#define DEAUTHER_VERSION "2.6.1"
+#define DEAUTHER_VERSION_MAJOR 2
+#define DEAUTHER_VERSION_MINOR 6
+#define DEAUTHER_VERSION_REVISION 1
 
-#ifndef AP_SSID
-  #define AP_SSID "#WifiX.1.5#"
-#endif 
+#define EEPROM_SIZE 4095
+#define BOOT_COUNTER_ADDR 1
+#define SETTINGS_ADDR 100
 
-#ifndef AP_PASSWD
-  #define AP_PASSWD "deauther"
-#endif 
+#define ATTACK_ALL_CH false
+#define RANDOM_TX false
+#define ATTACK_TIMEOUT 0
+#define DEAUTHS_PER_TARGET 25
+#define DEAUTH_REASON 1
+#define PROBE_FRAMES_PER_SSID 1
 
-#ifndef WEB_URL
-  #define WEB_URL "deauth.me"
-#endif 
+#define CH_TIME 200
+#define MIN_DEAUTH_FRAMES 3
+
+#define AP_SSID "#WifiX.1.5#"
+#define AP_PASSWD "deauther"
+#define AP_HIDDEN false
+#define AP_IP_ADDR { 192, 168, 4, 1 }
+
+#define WEB_ENABLED true
+#define WEB_CAPTIVE_PORTAL false
+#define WEB_USE_SPIFFS false
+#define DEFAULT_LANG "en"
+
+#define CLI_ENABLED true
+#define CLI_ECHO true
 
 #ifndef DISPLAY_TIMEOUT
   #define DISPLAY_TIMEOUT 600
 #endif
 
-#ifndef DEAUTHER_VERSION
-  #define DEAUTHER_VERSION "2.6.1"
-#endif
+// =============== LED MODE DEFINITIONS =============== //
+#define LED_MODE_OFF 0, 0, 0
+#define LED_MODE_SCAN 0, 0, 255
+#define LED_MODE_ATTACK 255, 0, 0
+#define LED_MODE_IDLE 0, 255, 0
 
-// =============== LED & DISPLAY LOGIC =============== //
 #if defined(LED_NEOPIXEL_RGB) || defined(LED_NEOPIXEL_GRB)
   #define LED_NEOPIXEL
 #endif 
@@ -84,10 +100,6 @@
   #define USE_LED false
 #else 
   #define USE_LED true
-#endif 
-
-#ifndef LED_MODE_BRIGHTNESS
-  #define LED_MODE_BRIGHTNESS 10
 #endif 
 
 // Penutup Error Check
