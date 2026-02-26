@@ -1,0 +1,45 @@
+name: Compile GMpro Deauther Auto-Library
+
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v1
+
+      - name: Install Deauther SDK
+        run: |
+          arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
+          arduino-cli core install deauther:esp8266 --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
+
+      - name: Auto-Download Libraries
+        run: |
+          mkdir -p $HOME/Arduino/libraries
+          
+          # Install SimpleCLI via CLI resmi
+          arduino-cli lib install "SimpleCLI"
+          
+          # Download ArduinoJson 5.13.5 otomatis (Versi Legacy yang stabil buat Deauther)
+          curl -L -o arduinojson.zip https://github.com/bblanchon/ArduinoJson/releases/download/v5.13.5/ArduinoJson-v5.13.5.zip
+          unzip -o arduinojson.zip -d $HOME/Arduino/libraries/
+          
+          # Cek folder buat mastiin library ke-install
+          ls -R $HOME/Arduino/libraries/
+
+      - name: Compile GMpro Firmware
+        run: |
+          # Compile menggunakan core Spacehuhn yang sudah mendukung packet injection
+          arduino-cli compile --fqbn deauther:esp8266:generic:eesz=4M2M \
+          --libraries $HOME/Arduino/libraries \
+          ./GMpro.ino --output-dir ./build
+
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: GMpro-Deauther-Binary
+          path: ./build/*.bin
