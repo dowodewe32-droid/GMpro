@@ -17,25 +17,25 @@ jobs:
           arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
           arduino-cli core install deauther:esp8266 --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
 
-      - name: Auto-Download Libraries
+      - name: Install Required Libraries
         run: |
-          mkdir -p $HOME/Arduino/libraries
+          # Install Library OLED & GFX (Penyebab Error)
+          arduino-cli lib install "Adafruit GFX Library"
+          arduino-cli lib install "Adafruit SSD1306"
+          arduino-cli lib install "Adafruit BusIO"
           
-          # Install SimpleCLI via CLI resmi
+          # Install Library Pendukung Lainnya
           arduino-cli lib install "SimpleCLI"
           
-          # Download ArduinoJson 5.13.5 otomatis (Versi Legacy yang stabil buat Deauther)
+          # Download ArduinoJson 5.13.5 (Legacy)
+          mkdir -p $HOME/Arduino/libraries
           curl -L -o arduinojson.zip https://github.com/bblanchon/ArduinoJson/releases/download/v5.13.5/ArduinoJson-v5.13.5.zip
           unzip -o arduinojson.zip -d $HOME/Arduino/libraries/
-          
-          # Cek folder buat mastiin library ke-install
-          ls -R $HOME/Arduino/libraries/
 
       - name: Compile GMpro Firmware
         run: |
-          # Compile menggunakan core Spacehuhn yang sudah mendukung packet injection
-          arduino-cli compile --fqbn deauther:esp8266:generic:eesz=4M2M \
-          --libraries $HOME/Arduino/libraries \
+          # Menggunakan FQBN yang sesuai dengan Wemos D1 Mini (4MB Flash)
+          arduino-cli compile --fqbn deauther:esp8266:d1_mini \
           ./GMpro.ino --output-dir ./build
 
       - name: Upload Binary
