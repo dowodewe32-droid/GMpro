@@ -17,26 +17,20 @@ jobs:
           arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
           arduino-cli core install deauther:esp8266 --additional-urls https://raw.githubusercontent.com/SpacehuhnTech/arduino/main/package_spacehuhn_index.json
 
-      - name: Force Install Libraries
+      - name: Install All Libraries
         run: |
-          # Buat folder library secara manual biar pasti ada
-          mkdir -p $HOME/Arduino/libraries
-          
-          # Install pake CLI (ini bakal naruh di default path)
+          # Install semua library lewat CLI agar struktur folder otomatis benar
           arduino-cli lib install "Adafruit GFX Library"
           arduino-cli lib install "Adafruit SSD1306"
           arduino-cli lib install "Adafruit BusIO"
           arduino-cli lib install "SimpleCLI"
-          
-          # Download ArduinoJson 5.13.5 (Legacy) langsung ke folder
-          curl -L -o arduinojson.zip https://github.com/bblanchon/ArduinoJson/releases/download/v5.13.5/ArduinoJson-v5.13.5.zip
-          unzip -o arduinojson.zip -d $HOME/Arduino/libraries/
+          # Versi legacy ArduinoJson untuk Deauther
+          arduino-cli lib install "ArduinoJson"@5.13.5
 
       - name: Compile GMpro Firmware
         run: |
-          # Paksa compiler nyari di folder library default dan folder manual
+          # Hapus flag --library manual karena CLI sudah tahu folder library-nya
           arduino-cli compile --fqbn deauther:esp8266:d1_mini \
-          --library $HOME/Arduino/libraries \
           ./GMpro.ino --output-dir ./build
 
       - name: Upload Binary
