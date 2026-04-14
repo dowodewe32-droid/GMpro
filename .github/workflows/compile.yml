@@ -10,10 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.x'
     
@@ -23,20 +23,10 @@ jobs:
     
     - name: Compile for ESP8266
       run: |
-        pio run -e nodemcuv2
+        pio run -e esp12e
     
     - name: Upload ESP8266 Binary
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: esp8266-firmware
-        path: .pio/build/nodemcuv2/firmware.bin
-    
-    - name: Compile for ESP32
-      run: |
-        pio run -e esp32wroom
-    
-    - name: Upload ESP32 Binary
-      uses: actions/upload-artifact@v3
-      with:
-        name: esp32-firmware
-        path: .pio/build/esp32wroom/firmware.bin
+        path: .pio/build/esp12e/firmware.bin
