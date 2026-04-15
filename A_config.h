@@ -14,6 +14,7 @@
 #define NODEMCU
 #define USE_LED true
 #define LED_NEOPIXEL_GRB
+#define LED_NEOPIXEL
 #define LED_NUM 1
 #define LED_NEOPIXEL_PIN 15 // Pin D8
 #define LED_MODE_BRIGHTNESS 10
