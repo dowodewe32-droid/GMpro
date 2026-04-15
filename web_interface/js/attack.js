@@ -1,11 +1,13 @@
 /* This software is licensed under the MIT License: https://github.com/spacehuhntech/esp8266_deauther */
 
 var attackJSON = [[false, 0, 0], [false, 0, 0], [false, 0, 0]];
+var deauthAllActive = false;
 
 function draw() {
 	getE("deauth").innerHTML = attackJSON[0][0] ? lang("stop") : lang("start");
 	getE("beacon").innerHTML = attackJSON[1][0] ? lang("stop") : lang("start");
 	getE("probe").innerHTML = attackJSON[2][0] ? lang("stop") : lang("start");
+	getE("deauthall").innerHTML = deauthAllActive ? lang("stop") : lang("start");
 
 	getE("deauthTargets").innerHTML = esc(attackJSON[0][1] + "");
 	getE("beaconTargets").innerHTML = esc(attackJSON[1][1] + "");
@@ -47,10 +49,24 @@ function draw() {
                         xhttp.open("GET", "filelist", true);
                         xhttp.send();
                       }
-                 
+                  
+function deauthall() {
+    if(deauthAllActive) {
+        getFile("run?cmd=stop attack", function () {
+            deauthAllActive = false;
+            load();
+        });
+    } else {
+        getFile("run?cmd=attack deauthall", function () {
+            deauthAllActive = true;
+            load();
+        });
+    }
+}
 
 function stopAll() {
 	getFile("run?cmd=stop attack", function () {
+		deauthAllActive = false;
 		load();
 	});
 }
@@ -68,7 +84,7 @@ function start(mode) {
 			break;
 	}
 	getFile("run?cmd=attack" + (attackJSON[0][0] ? " -d" : "") + (attackJSON[1][0] ? " -b" : "") + (attackJSON[2][0] ? " -p" : ""), function () {
-		setTimeout(load, 2000);
+		setTimeout(load, 1000);
 		draw();
 	});
 }

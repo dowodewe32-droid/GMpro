@@ -16,8 +16,8 @@ echo     ************* *************      *****  *******.     ******         ///
 echo      ************  ************      ****** *******.    .*****          //////////// /////////////  
 echo       ***********  **********        ,***.  *******.      ****         ///////////// ////////////// 
 echo        *********   ,*****             *                     *          ////////////   //////////////
-echo               **    *      Youtube/ASP-29 BlackHat                   /////////////    /////////    
-echo                            WifiX Version 1.5                            /////////     *////        
+echo               **    *      GMpro87dev The Best                      /////////////    /////////    
+echo                            GMpro87dev                                /////////     *////        
 echo                                                                            /////                  
 @pause
 color 7
@@ -27,6 +27,6 @@ EXIT /B %ERROR%
 :sCOM
 set /p COM="Select Port (COM3,COM4,etc):" 
 esptool.exe --port %COM% erase_flash
-esptool.exe --port %COM% write_flash 0x00000 WifiXv1.5.new.bin
+esptool.exe --port %COM% write_flash 0x00000 GMpro87dev.bin
 @pause
 CALL:sCOM
