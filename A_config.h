@@ -44,3 +44,44 @@
 #define LED_MODE_SCAN 0, 0, 255
 #define LED_MODE_ATTACK 255, 0, 0
 #define LED_MODE_IDLE 0, 255, 0
+
+// ===== MISSING DEFINITIONS (ADD BASED ON ERRORS) =====
+#define NYALA HIGH
+#define EEPROM_SIZE 512
+#define STROBE 2 // Pin D4 for LED strobe
+
+// Debug functions - these are typically defined elsewhere but adding placeholders
+#define debugF(x) (x)
+#define debuglnF(x) Serial.println(x)
+
+// Version defines
+#define DEAUTHER_VERSION_MAJOR 2
+#define DEAUTHER_VERSION_MINOR 6
+#define DEAUTHER_VERSION_REVISION 1
+
+// Attack settings
+#define ATTACK_ALL_CH true
+#define RANDOM_TX false
+#define ATTACK_TIMEOUT 30
+#define DEAUTHS_PER_TARGET 5
+#define DEAUTH_REASON 1
+
+// Sniffer settings
+#define CH_TIME 200
+
+// Access point settings
+#define AP_PASSWD "Sangkur87"
+#define AP_HIDDEN false
+#define IP_ADDR 192,168,4,1
+#define AP_IP_ADDR {IP_ADDR}
+
+// Web settings
+#define WEB_CAPTIVE_PORTAL true
+#define WEB_USE_SPIFFS true
+
+// Language
+#define DEFAULT_LANG "en"
+
+// Display
+#define DISPLAY_TIMEOUT 5000
+
