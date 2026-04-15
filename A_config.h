@@ -14,8 +14,6 @@
 #define NODEMCU
 #define USE_LED true
 #define LED_NEOPIXEL_GRB
-#define LED_NEOPIXEL
-#define LED_NEOPIXEL
 #define LED_NUM 1
 #define LED_NEOPIXEL_PIN 15 // Pin D8
 #define LED_MODE_BRIGHTNESS 10
@@ -76,15 +74,14 @@
 #define WEB_USE_SPIFFS true
 #define DEFAULT_LANG "en"
 
+// ===== WEB SERVER SETTINGS =====
+#define WEB_IP_ADDR IPAddress(192,168,4,1)
+#define WEB_URL "esp8266-webupdate"
+#define WEB_NETMASK IPAddress(255,255,255,0)
+#define WEB_SERVER_PORT 80
+
 // ===== LED MODES =====
 #define LED_MODE_OFF 0, 0, 0
 #define LED_MODE_SCAN 0, 0, 255
 #define LED_MODE_ATTACK 255, 0, 0
 #define LED_MODE_IDLE 0, 255, 0
-
-// ===== BUTTONS =====
-#define BUTTON_UP 14   // D5
-#define BUTTON_DOWN 12 // D6
-#define BUTTON_A 2     // D4
-#define BUTTON_B 0     // D3
-#define RESET_BUTTON 0 // Flash Button
