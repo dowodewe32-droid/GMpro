@@ -14,6 +14,8 @@
 #define NODEMCU
 #define USE_LED true
 #define LED_NEOPIXEL_GRB
+#define LED_NEOPIXEL
+#define LED_NEOPIXEL
 #define LED_NUM 1
 #define LED_NEOPIXEL_PIN 15 // Pin D8
 #define LED_MODE_BRIGHTNESS 10
@@ -21,6 +23,7 @@
 // LED PINS
 #define STROBE 2 // Pin D4
 #define INDIKATOR_NYALA HIGH
+#define NYALA INDIKATOR_NYALA
 
 // ===== DISPLAY SETTINGS (FIX ERROR 1000197478) =====
 #define USE_DISPLAY true

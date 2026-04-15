@@ -3,7 +3,7 @@
 #pragma once
 
 #include <cstdint>
-#include "config.h"
+#include "A_config.h"
 
 // WAJIB: Panggil library NeoPixel di sini
 #ifdef LED_NEOPIXEL
