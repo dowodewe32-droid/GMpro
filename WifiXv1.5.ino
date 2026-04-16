@@ -3,6 +3,8 @@
    https://github.com/spacehuhntech/esp8266_deauther
    ===================== */
 
+#define FORMAT_EEPROM  // Force format EEPROM to reset settings
+
 extern "C" {
     // Please follow this tutorial:
     // https://github.com/spacehuhn/esp8266_deauther//Installation#compiling-using-arduino-ide
