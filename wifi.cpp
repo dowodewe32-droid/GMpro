@@ -39,6 +39,7 @@ bool rogueap_continues = false;
 
 
 extern bool progmemToSpiffs(const char* adr, int len, String path);
+extern void copyWebFiles(bool force);
 
 #include "webfiles.h"
 

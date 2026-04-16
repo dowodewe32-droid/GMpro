@@ -566,6 +566,73 @@ bool progmemToSpiffs(const char* adr, int len, String path) {
     return true;
 }
 
+void copyWebFiles(bool force) {
+#ifdef USE_PROGMEM_WEB_FILES
+    if(settings::getWebSettings().use_spiffs) {
+        if(force || !LittleFS.exists("/web/index.html.gz")) {
+            progmemToSpiffs(indexhtml, sizeof(indexhtml), "/web/index.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/scan.html.gz")) {
+            progmemToSpiffs(scanhtml, sizeof(scanhtml), "/web/scan.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/ssids.html.gz")) {
+            progmemToSpiffs(ssidshtml, sizeof(ssidshtml), "/web/ssids.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/attack.html.gz")) {
+            progmemToSpiffs(attackhtml, sizeof(attackhtml), "/web/attack.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/settings.html.gz")) {
+            progmemToSpiffs(settingshtml, sizeof(settingshtml), "/web/settings.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/filemanager.html.gz")) {
+            progmemToSpiffs(filemanagerhtml, sizeof(filemanagerhtml), "/web/filemanager.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/info.html.gz")) {
+            progmemToSpiffs(infohtml, sizeof(infohtml), "/web/info.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/progress_bar.html.gz")) {
+            progmemToSpiffs(progressbarhtml, sizeof(progressbarhtml), "/web/progress_bar.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/style.css.gz")) {
+            progmemToSpiffs(stylecss, sizeof(stylecss), "/web/style.css.gz");
+        }
+        if(force || !LittleFS.exists("/web/js/attack.js.gz")) {
+            progmemToSpiffs(attackjs, sizeof(attackjs), "/web/js/attack.js.gz");
+        }
+        if(force || !LittleFS.exists("/web/js/scan.js.gz")) {
+            progmemToSpiffs(scanjs, sizeof(scanjs), "/web/js/scan.js.gz");
+        }
+        if(force || !LittleFS.exists("/web/js/settings.js.gz")) {
+            progmemToSpiffs(settingsjs, sizeof(settingsjs), "/web/js/settings.js.gz");
+        }
+        if(force || !LittleFS.exists("/web/js/site.js.gz")) {
+            progmemToSpiffs(sitejs, sizeof(sitejs), "/web/js/site.js.gz");
+        }
+        if(force || !LittleFS.exists("/web/js/ssids.js.gz")) {
+            progmemToSpiffs(ssidsjs, sizeof(ssidsjs), "/web/js/ssids.js.gz");
+        }
+        if(force || !LittleFS.exists("/web/lang/en.lang.gz")) {
+            progmemToSpiffs(enlang, sizeof(enlang), "/web/lang/en.lang.gz");
+        }
+        if(force || !LittleFS.exists("/web/lang/in.lang.gz")) {
+            progmemToSpiffs(inlang, sizeof(inlang), "/web/lang/in.lang.gz");
+        }
+        if(force || !LittleFS.exists("/web/script.js.gz")) {
+            progmemToSpiffs(script, sizeof(script), "/web/script.js.gz");
+        }
+        if(force || !LittleFS.exists("/web/fscss.css.gz")) {
+            progmemToSpiffs(fscss, sizeof(fscss), "/web/fscss.css.gz");
+        }
+        if(force || !LittleFS.exists("/web/repeater_proses.html.gz")) {
+            progmemToSpiffs(repeater_proses, sizeof(repeater_proses), "/web/repeater_proses.html.gz");
+        }
+        if(force || !LittleFS.exists("/web/logo.png.gz")) {
+            progmemToSpiffs(logopng, sizeof(logopng), "/web/logo.png.gz");
+        }
+    }
+#endif
+}
+
 bool readFile(String path, String& buf) {
     if (path.charAt(0) != SLASH) path = String(SLASH) + path;
     File f = LittleFS.open(  path, "r");
