@@ -10,17 +10,8 @@
 #include <lwip/napt.h>
 #include <lwip/dns.h>
 
-extern "C" {
-  #include <dhcpserver.h>
-}
-
 #define NAPT 1000
 #define NAPT_PORT 10
-
-// Helper function to set DNS via lwIP
-void set_softap_dns(IPAddress dns) {
-    dhcps_set_dns(0, dns);
-}
 
 typedef struct ap_settings_t {
     char    path[33];
@@ -52,7 +43,6 @@ namespace repeater {
         
         delay(1000); 
         
-        set_softap_dns(WiFi.dnsIP(0));
         WiFi.softAPConfig(IPAddress(172, 217, 28, 254), IPAddress(172, 217, 28, 254), IPAddress(255, 255, 255, 0));
         WiFi.softAP(ap_settings.ssid, ap_settings.password);
         
