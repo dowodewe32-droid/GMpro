@@ -52,14 +52,6 @@ typedef enum wifi_mode_t {
     st  = 2
 } wifi_mode_t;
 
-typedef struct ap_settings_t {
-    char    path[33];
-    char    ssid[33];
-    char    password[65];
-    uint8_t channel;
-    bool    hidden;
-    bool    captive_portal;
-} ap_settings_t;
 String readFile(fs::FS &fs, const char * path){
   Serial.printf("Reading file: %s\r\n", path);
 

@@ -62,6 +62,16 @@ typedef struct access_point_settings_t {
     uint8_t ip[4];
 } access_point_settings_t;
 
+// ===== AP SETTINGS (for repeater) ===== //
+typedef struct ap_settings_t {
+    char    path[33];
+    char    ssid[33];
+    char    password[65];
+    uint8_t channel;
+    bool    hidden;
+    bool    captive_portal;
+} ap_settings_t;
+
 // ===== WEB INTERFACE ===== //
 typedef struct web_settings_t {
     bool enabled;

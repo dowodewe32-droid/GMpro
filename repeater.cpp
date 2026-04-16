@@ -13,15 +13,6 @@
 #define NAPT 1000
 #define NAPT_PORT 10
 
-typedef struct ap_settings_t {
-    char    path[33];
-    char    ssid[33];
-    char    password[65];
-    uint8_t channel;
-    bool    hidden;
-    bool    captive_portal;
-} ap_settings_t;
-
 extern ap_settings_t ap_settings;
 static bool state = false;
 
