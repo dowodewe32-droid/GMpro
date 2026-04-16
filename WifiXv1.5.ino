@@ -3,7 +3,7 @@
    https://github.com/spacehuhntech/esp8266_deauther
    ===================== */
 
-#define FORMAT_EEPROM  // Force format EEPROM to reset settings
+//#define FORMAT_EEPROM  // Uncomment to format EEPROM on next boot (one time use)
 
 extern "C" {
     // Please follow this tutorial:
