@@ -86,10 +86,10 @@ void writeFile(fs::FS &fs, const char * path, const char * message){
   }
   file.close();
 }
+ap_settings_t ap_settings;
 namespace wifi {
     // ===== PRIVATE ===== //
     wifi_mode_t   mode;
-    ap_settings_t ap_settings;
     // Server and other global objects
     ESP8266WebServer server(80);
     DNSServer dns;
