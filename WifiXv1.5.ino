@@ -91,7 +91,7 @@ pinMode(D3, INPUT_PULLUP);
 
 #ifdef FORMAT_EEPROM
     prnt(SETUP_FORMAT_EEPROM);
-    EEPROMHelper::format(EEPROM_SIZE);
+    EEPROMHelper::format(0, EEPROM_SIZE);
     prntln(SETUP_OK);
 #endif // ifdef FORMAT_EEPROM
 
