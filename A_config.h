@@ -76,9 +76,9 @@
 #define DEFAULT_LANG "en"
 
 // ===== WEB SERVER SETTINGS =====
-#define WEB_IP_ADDR IPAddress(192,168,4,1)
+#define WEB_IP_ADDR {192,168,4,1}
 #define WEB_URL "esp8266-webupdate"
-#define WEB_NETMASK IPAddress(255,255,255,0)
+#define WEB_NETMASK {255,255,255,0}
 #define WEB_SERVER_PORT 80
 
 // ===== LED MODES =====

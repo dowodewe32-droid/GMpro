@@ -101,7 +101,7 @@ namespace wifi {
     // Server and other global objects
     ESP8266WebServer server(80);
     DNSServer dns;
-    IPAddress ip WEB_IP_ADDR;
+    IPAddress ip(192, 168, 4, 1);
     IPAddress    netmask(255, 255, 255, 0);
 
     void setPath(String path) {
